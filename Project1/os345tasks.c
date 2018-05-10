@@ -48,6 +48,14 @@ int createTask(char* name,						// task name
 {
 	int tid;
 
+	int newArgc = argc;
+	newArgc = argc;
+	// Malloc new argv variables for the argv
+	char ** newArgv = (char **)malloc(sizeof(char*) * argc);
+	for (int i = 0; i < argc; i++) {
+		newArgv[i] = (char *)malloc(sizeof(char *) * (strlen(argv[i]) + 1));
+		newArgv[i] = strcpy(newArgv[i], argv[i]);
+	}
 	// find an open tcb entry slot
 	for (tid = 0; tid < MAX_TASKS; tid++)
 	{
@@ -70,10 +78,10 @@ int createTask(char* name,						// task name
 			tcb[tid].state = S_NEW;			// NEW task state
 			tcb[tid].priority = priority;	// task priority
 			tcb[tid].parent = curTask;		// parent
-			tcb[tid].argc = argc;			// argument count
+			tcb[tid].argc = newArgc;			// argument count
 
 			// ?? malloc new argv parameters
-			tcb[tid].argv = argv;			// argument pointers
+			tcb[tid].argv = newArgv;			// argument pointers
 
 			tcb[tid].event = 0;				// suspend semaphore
 			tcb[tid].RPT = 0;					// root page table (project 5)
@@ -176,5 +184,10 @@ int sysKillTask(int taskId)
 	// ?? delete task from system queues
 
 	tcb[taskId].name = 0;			// release tcb slot
+	for (int i = 0; i < tcb[taskId].argc; i++) {
+		free(tcb[taskId].argv[i]);
+	}
+	free(tcb[taskId].argv);
+	//free(tcb[taskId].argc);
 	return 0;
 } // end sysKillTask

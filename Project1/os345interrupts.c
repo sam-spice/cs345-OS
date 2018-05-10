@@ -116,6 +116,22 @@ static void keyboard_isr()
 				break;
 			}
 
+			case 0x8:						// backspace
+			{
+				if (inBufIndx > 0) {
+				inBuffer[inBufIndx] = 0;
+				inBufIndx--;
+				printf("%c", inChar);
+				printf("%c", 0);
+				printf("%c", inChar);
+				}
+				else if (inBufIndx == 0) {
+					inBuffer[inBufIndx] = 0;
+					//printf("%c", inChar);
+				}
+				break;
+			}
+
 			default:
 			{
 				inBuffer[inBufIndx++] = inChar;
