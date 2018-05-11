@@ -51,6 +51,8 @@ extern char inChar;				// last entered character
 extern int charFlag;				// 0 => buffered input
 extern int inBufIndx;				// input pointer into input buffer
 extern char inBuffer[INBUF_SIZE+1];	// character input buffer
+extern char lastBufIndx;
+extern char lastBuffer[INBUF_SIZE + 1];
 
 extern time_t oldTime1;					// old 1sec time
 extern clock_t myClkTime;
@@ -103,9 +105,22 @@ static void keyboard_isr()
 			case '\r':
 			case '\n':
 			{
+				for (int i = 0; i <= inBufIndx; i++) {
+					lastBuffer[i] = inBuffer[i];
+				}
+				lastBufIndx = inBufIndx;
 				inBufIndx = 0;				// EOL, signal line ready
 				semSignal(inBufferReady);	// SIGNAL(inBufferReady)
 				break;
+			}
+			case 0xc:
+			{
+				printf("\n");
+				for (int i = 0; i <= lastBufIndx; i++) {
+					inBuffer[i] = lastBuffer[i];
+				}
+				inBufIndx = lastBufIndx;
+				printf("%s", inBuffer);
 			}
 			case 0x12:
 			{

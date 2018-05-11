@@ -75,6 +75,8 @@ char inChar;						// last entered character
 int charFlag;						// 0 => buffered input
 int inBufIndx;						// input pointer into input buffer
 char inBuffer[INBUF_SIZE+1];		// character input buffer
+int lastBufIndx;
+char lastBuffer[INBUF_SIZE + 1];
 //Message messages[NUM_MESSAGES];		// process message buffers
 
 int pollClock;						// current clock()
