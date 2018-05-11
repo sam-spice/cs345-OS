@@ -50,7 +50,20 @@ Command* newCommand(char*, char*, int (*func)(int, char**), char*);
 
 void mySigIntHandler()
 {
-	printf("Hellomynameisinigomontoyayoukilledmyfatherpreparetodie");
+	//printf("Hellomynameisinigomontoyayoukilledmyfatherpreparetodie");
+	sigSignal(-1, mySIGTERM);
+}
+
+void mySigTermHandler() {
+	killTask(curTask);
+}
+
+void mySigTStopHandler() {
+	sigSignal(-1, mySIGSTOP);
+}
+
+void mySigContHandler() {
+	return 0;
 }
 
 // ***********************************************************************
@@ -76,6 +89,9 @@ int P1_shellTask(int argc, char* argv[])
 	commands = P1_init();					// init shell commands
 
 	sigAction(mySigIntHandler, mySIGINT);
+	sigAction(mySigTermHandler, mySIGTERM);
+	sigAction(mySigTStopHandler, mySIGTSTP);
+	sigAction(mySigContHandler, mySIGCONT);
 
 
 	while (1)
@@ -86,7 +102,7 @@ int P1_shellTask(int argc, char* argv[])
 
 		SEM_WAIT(inBufferReady);			// wait for input buffer semaphore
 		if (!inBuffer[0]) continue;		// ignore blank lines
-		else printf("\n%s\n", inBuffer);
+		//else printf("\n%s\n", inBuffer);
 		int background = 0;
 
 		SWAP										// do context switch
@@ -129,13 +145,13 @@ int P1_shellTask(int argc, char* argv[])
 					ctr++;
 					char * temp = calloc(sizeof(char *) * (ctr + 1), sizeof(char *));
 					temp = strncpy(temp, sp, ctr);
-					printf(" temp = %s", temp);
+					//printf(" temp = %s", temp);
 					myArgv[newArgc++] = temp;
 					sp = &sp[ctr - 1];
 
 				}
 				else {
-					printf("sp = %c\n", sp[0]);
+					//printf("sp = %c\n", sp[0]);
 					myArgv[newArgc++] = sp;
 				}
 			}
@@ -169,7 +185,7 @@ int P1_shellTask(int argc, char* argv[])
 					break;
 				}
 				else {
-					createTask("task", (*commands[i]->func), LOW_PRIORITY, newArgc, newArgv);
+					createTask(commands[i]->description, (*commands[i]->func), LOW_PRIORITY, newArgc, newArgv);
 					found = TRUE;
 					break;
 				}
@@ -208,12 +224,12 @@ int P1AliveTask(int argc, char* argv[])
 
 int P1_project1(int argc, char* argv[])
 {
-	printf("\nhere %d\n", argc);
+	//printf("\nhere %d\n", argc);
 	int p1_mode = 0;
-	printf("commands!\n");
-	for (int i = 0; i < argc; i++) {
+	//printf("commands!\n");
+	/*for (int i = 0; i < argc; i++) {
 		printf("%s\n", argv[i]);
-	}
+	}*/
 	// check if just changing P1 mode
 	if (argc > 1)
 	{
@@ -310,6 +326,22 @@ int P1_help(int argc, char* argv[])
 	return 0;
 } // end P1_help
 
+void add(int argc, char* argv[]) {
+	float sum = 0.00;
+	for (int i = 0; i < argc; i++) {
+		sum += strtof(argv[i], NULL);
+	}
+	printf("Sum = %f", sum);
+	return 0;
+}
+
+void args(int argc, char* argv[]) {
+	printf("\nParameters given:\n");
+	for (int i = 0; i < argc; i++) {
+		printf("%s\n", argv[i]);
+	}
+	return 0;
+}
 
 // ***********************************************************************
 // ***********************************************************************
@@ -341,7 +373,7 @@ Command* newCommand(char* command, char* shortcut, int (*func)(int, char**), cha
 Command** P1_init()
 {
 	int i  = 0;
-	Command** commands = (Command**)malloc(sizeof(Command*) * NUM_COMMANDS);
+	Command** commands = (Command**)malloc(sizeof(Command*) * (NUM_COMMANDS));
 
 	// system
 	commands[i++] = newCommand("quit", "q", P1_quit, "Quit");
@@ -352,6 +384,11 @@ Command** P1_init()
 	commands[i++] = newCommand("project1", "p1", P1_project1, "P1: Shell");
 	commands[i++] = newCommand("help", "he", P1_help, "OS345 Help");
 	commands[i++] = newCommand("lc3", "lc3", P1_lc3, "Execute LC3 program");
+	commands[i++] = newCommand("add", "add", add, "add function");
+	commands[i++] = newCommand("args", "args", args, "Display Argv Values");
+
+
+
 
 	// P2: Tasking
 	commands[i++] = newCommand("project2", "p2", P2_project2, "P2: Tasking");

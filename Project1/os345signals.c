@@ -43,6 +43,21 @@ int signals(void)
 			tcb[curTask].signal &= ~mySIGINT;
 			(*tcb[curTask].sigIntHandler)();
 		}
+		if (tcb[curTask].signal & mySIGTERM) {
+			tcb[curTask].signal &= ~mySIGTERM;
+			(*tcb[curTask].sigTermHandler)();
+		}
+		if (tcb[curTask].signal & mySIGCONT) {
+			tcb[curTask].signal &= ~mySIGCONT;
+			tcb[curTask].signal &= ~mySIGSTOP;
+			tcb[curTask].signal &= ~mySIGTSTP;
+
+			(*tcb[curTask].sigContHandler)();
+		}
+		if (tcb[curTask].signal & mySIGTSTP) {
+			tcb[curTask].signal &= mySIGTSTP;
+			(*tcb[curTask].sigTstpHandler)();
+		}
 	}
 	return 0;
 }
@@ -59,6 +74,21 @@ int sigAction(void (*sigHandler)(void), int sig)
 		case mySIGINT:
 		{
 			tcb[curTask].sigIntHandler = sigHandler;		// mySIGINT handler
+			return 0;
+		}
+		case mySIGTERM:
+		{
+			tcb[curTask].sigTermHandler = sigHandler;
+			return 0;
+		}
+		case mySIGTSTP:
+		{
+			tcb[curTask].sigTstpHandler = sigHandler;
+			return 0;
+		}
+		case mySIGCONT:
+		{
+			tcb[curTask].sigContHandler = sigHandler;
 			return 0;
 		}
 	}
@@ -85,6 +115,10 @@ int sigSignal(int taskId, int sig)
 		for (taskId=0; taskId<MAX_TASKS; taskId++)
 		{
 			sigSignal(taskId, sig);
+			if (sig == mySIGCONT) {
+				tcb[taskId].signal &= ~mySIGSTOP;
+				tcb[taskId].signal &= ~mySIGTSTP;
+			}
 		}
 		return 0;
 	}
@@ -110,7 +144,11 @@ void createTaskSigHandlers(int tid)
 	if (tid)
 	{
 		// inherit parent signal handlers
-		tcb[tid].sigIntHandler = tcb[curTask].sigIntHandler;			// mySIGINT handler
+		tcb[tid].sigIntHandler = tcb[curTask].sigIntHandler;
+		tcb[tid].sigTermHandler = tcb[curTask].sigTermHandler;// mySIGINT handler
+		tcb[tid].sigTstpHandler = tcb[curTask].sigTstpHandler;
+		tcb[tid].sigContHandler = tcb[curTask].sigContHandler;
+
 	}
 	else
 	{

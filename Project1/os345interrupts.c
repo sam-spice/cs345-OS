@@ -97,6 +97,7 @@ static void keyboard_isr()
 	semSignal(charReady);					// SIGNAL(charReady) (No Swap)
 	if (charFlag == 0)
 	{
+		//printf("%x", inChar);
 		switch (inChar)
 		{
 			case '\r':
@@ -106,12 +107,21 @@ static void keyboard_isr()
 				semSignal(inBufferReady);	// SIGNAL(inBufferReady)
 				break;
 			}
-
+			case 0x12:
+			{
+				sigSignal(-1, mySIGCONT);
+				break;
+			}
+			case 0x17:
+			{
+				sigSignal(-1, mySIGTSTP);
+				break;
+			}
 			case 0x18:						// ^x
 			{
 				inBufIndx = 0;
 				inBuffer[0] = 0;
-				sigSignal(0, mySIGINT);		// interrupt task 0
+				sigSignal(-0, mySIGINT);		// interrupt task 0
 				semSignal(inBufferReady);	// SEM_SIGNAL(inBufferReady)
 				break;
 			}

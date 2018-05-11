@@ -270,6 +270,7 @@ static int dispatcher()
 
 		case S_BLOCKED:
 		{
+			signals();
 			break;
 		}
 
