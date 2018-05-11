@@ -331,7 +331,7 @@ void add(int argc, char* argv[]) {
 	for (int i = 0; i < argc; i++) {
 		sum += strtof(argv[i], NULL);
 	}
-	printf("Sum = %f", sum);
+	printf("Sum = %f\n", sum);
 	return 0;
 }
 
