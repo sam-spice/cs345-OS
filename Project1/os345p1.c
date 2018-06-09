@@ -327,12 +327,28 @@ int P1_help(int argc, char* argv[])
 } // end P1_help
 
 void add(int argc, char* argv[]) {
-	float sum = 0.00;
+	/*float sum = 0.00;
 	for (int i = 0; i < argc; i++) {
 		sum += strtof(argv[i], NULL);
 	}
 	printf("Sum = %f\n", sum);
-	return 0;
+	return 0;*/
+	PQ*  q = (PQ*)malloc(sizeof(PQ));
+	q->size = 0;
+	enQ(q, 1, 20);
+	printq(q);
+	
+	enQ(q, 3, 20);
+	printq(q);
+
+	enQ(q, 2, 1);
+	printq(q);
+
+	enQ(q, 4, 1);
+	printq(q);
+
+	free(q);
+
 }
 
 void args(int argc, char* argv[]) {

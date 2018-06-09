@@ -86,7 +86,7 @@ bool diskMounted;					// disk has been mounted
 time_t oldTime1;					// old 1sec time
 clock_t myClkTime;
 clock_t myOldClkTime;
-int* rq;							// ready priority queue
+PQ* rq;							// ready priority queue
 
 
 // **********************************************************************
@@ -201,9 +201,14 @@ static int scheduler()
 	nextTask = ++curTask;
 
 	// mask sure nextTask is valid
-	while (!tcb[nextTask].name)
+	/*while (!tcb[nextTask].name)
 	{
 		if (++nextTask >= MAX_TASKS) nextTask = 0;
+	}*/
+	
+	if ((nextTask = deQ(rq, -1)) >= 0)
+	{
+		enQ(rq, nextTask, tcb[nextTask].priority);
 	}
 	if (tcb[nextTask].signal & mySIGSTOP) return -1;
 
@@ -354,7 +359,8 @@ static int initOS()
 	diskMounted = 0;					// disk has been mounted
 
 	// malloc ready queue
-	rq = (int*)malloc(MAX_TASKS * sizeof(int));
+	rq = (PQ*)malloc(sizeof(PQ));
+	rq->size = 0;
 	if (rq == NULL) return 99;
 
 	// capture current time

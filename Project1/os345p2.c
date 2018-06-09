@@ -36,6 +36,7 @@ extern TCB tcb[];								// task control block
 extern int curTask;							// current task #
 extern Semaphore* semaphoreList;			// linked list of active semaphores
 extern jmp_buf reset_context;				// context of kernel stack
+extern PQ * rq;
 
 // ***********************************************************************
 // project 2 functions and tasks
@@ -90,7 +91,7 @@ int P2_project2(int argc, char* argv[])
 int P2_listTasks(int argc, char* argv[])
 {
 	int i;
-
+	printq(rq);
 //	?? 1) List all tasks in all queues
 // ?? 2) Show the task stake (new, running, blocked, ready)
 // ?? 3) If blocked, indicate which semaphore
@@ -105,8 +106,10 @@ int P2_listTasks(int argc, char* argv[])
 			else if (tcb[i].state == S_NEW) my_printf("New");
 			else if (tcb[i].state == S_READY) my_printf("Ready");
 			else if (tcb[i].state == S_RUNNING) my_printf("Running");
-			else if (tcb[i].state == S_BLOCKED) my_printf("Blocked    %s",
-		  				tcb[i].event->name);
+			else if (tcb[i].state == S_BLOCKED) {
+				my_printf("Blocked    %s",tcb[i].event->name);
+				printq(tcb[i].event->q);
+			}
 			else if (tcb[i].state == S_EXIT) my_printf("Exiting");
 			swapTask();
 		}
@@ -273,3 +276,58 @@ char* myTime(char* svtime)
 	svtime[strlen(svtime)-1] = 0;		// eliminate nl at end
 	return svtime;
 } // end myTime
+
+int deQ(PQ * q, TID tid) {
+	if (tid == -1) {
+		if (q->size == 0) {
+			return -1;
+		}
+		else {
+			int to_return = q->pq[q->size - 1].tid;
+			q->size--;
+			return to_return;
+		}
+	}
+	else {
+		for (int i = 0; i < q->size; i++) {
+			if (q->pq[i].tid == tid) {
+				for (int j = i; j < q->size; j++) {
+					q->pq[j] = q->pq[j + 1];
+				}
+				q->size--;
+				return tid;
+			}
+		}
+		return -1;
+	}
+}
+
+int enQ(PQ * q, TID tid, int priority) {
+	if (q->size == 0) {
+		q->pq[0].tid = tid;
+		q->pq[0].priority = priority;
+		q->size++;
+	}
+	else {
+		//q->size++;
+		int i = 0;
+		while (q->pq[i].priority < priority && i < q->size) i++;
+		//i++;
+		for (int j = q->size; j > i; j--) {
+			q->pq[j] = q->pq[j - 1];
+		}
+		q->pq[i].tid = tid;
+		q->pq[i].priority = priority;
+		q->size++;
+	}
+	//printq(q);
+	return tid;
+}
+
+void printq(PQ * q) {
+	printf("Queue Size: %d\n", q->size);
+	for (int i = 0; i < q->size; i++) {
+		printf("\tTID: %d\n", q->pq[i].tid);
+		printf("\tPriority: %d\n", q->pq[i].priority);
+	}
+}

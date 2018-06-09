@@ -31,6 +31,7 @@
 
 extern TCB tcb[];							// task control block
 extern int curTask;							// current task #
+extern PQ * rq;
 
 extern int superMode;						// system mode
 extern Semaphore* semaphoreList;			// linked list of active semaphores
@@ -48,6 +49,7 @@ int createTask(char* name,						// task name
 {
 	int tid;
 
+	
 	int newArgc = argc;
 	newArgc = argc;
 	// Malloc new argv variables for the argv
@@ -94,7 +96,7 @@ int createTask(char* name,						// task name
 			tcb[tid].stack = malloc(STACK_SIZE * sizeof(int));
 
 			// ?? may require inserting task into "ready" queue
-
+			enQ(rq, tid, priority);
 			if (tid) swapTask();				// do context switch (if not cli)
 			return tid;							// return tcb index (curTask)
 		}

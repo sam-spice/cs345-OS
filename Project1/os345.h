@@ -68,6 +68,19 @@ enum {PAGE_INIT, PAGE_READ, PAGE_OLD_WRITE, PAGE_NEW_WRITE,
 typedef int bool;						// boolean value
 typedef int TID;						// task id
 
+typedef struct
+{
+	unsigned short size;
+	struct
+	{
+		unsigned char tid;
+		unsigned char priority;
+	} pq[MAX_TASKS];
+} PQ;
+
+int enQ(PQ *, TID, int);
+int deQ(PQ *, TID);
+void printq(PQ *);
 // semaphore
 typedef struct semaphore			// semaphore
 {
@@ -75,8 +88,11 @@ typedef struct semaphore			// semaphore
 	char* name;							// semaphore name
 	int state;							// semaphore state
 	int type;							// semaphore type
+	PQ * q;
 	int taskNum;						// semaphore creator task #
 } Semaphore;
+
+
 
 // task control block
 typedef struct							// task control block

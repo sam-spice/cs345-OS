@@ -29,6 +29,7 @@
 
 extern TCB tcb[];							// task control block
 extern int curTask;							// current task #
+extern PQ * rq;
 
 extern int superMode;						// system mode
 extern Semaphore* semaphoreList;			// linked list of active semaphores
@@ -44,29 +45,32 @@ extern Semaphore* semaphoreList;			// linked list of active semaphores
 void semSignal(Semaphore* s)
 {
 	int i;
+	int inQueue;
 	// assert there is a semaphore and it is a legal type
 	assert("semSignal Error" && s && ((s->type == 0) || (s->type == 1)));
 
 	// check semaphore type
 	if (s->type == 0)
 	{
+		if(!strcmp(s->name, "s1Sem")) printf("Here for sem %s", s->name);
 		// binary semaphore
 		// look through tasks for one suspended on this semaphore
-
+		
 temp:	// ?? temporary label
-		for (i=0; i<MAX_TASKS; i++)	// look for suspended task
+		
+		if ((inQueue = deQ(s->q, -1)) >= 0) // look for suspended task
 		{
-			if (tcb[i].event == s)
-			{
+			
 				s->state = 0;				// clear semaphore
-				tcb[i].event = 0;			// clear event pointer
-				tcb[i].state = S_READY;	// unblock task
+				tcb[inQueue].event = 0;			// clear event pointer
+				tcb[inQueue].state = S_READY;	// unblock task
 
 				// ?? move task from blocked to ready queue
-
+				enQ(rq, inQueue, tcb[inQueue].priority);
+				printf("sem sig\n queue for %s", s->name);
+				printq(s->q);
 				if (!superMode) swapTask();
 				return;
-			}
 		}
 		// nothing waiting on semaphore, go ahead and just signal
 		s->state = 1;						// nothing waiting, signal
@@ -109,8 +113,12 @@ temp:	// ?? temporary label
 			tcb[curTask].event = s;		// block task
 			tcb[curTask].state = S_BLOCKED;
 
-			// ?? move task from ready queue to blocked queue
 
+			// ?? move task from ready queue to blocked queue
+			deQ(rq, curTask);
+			enQ(s->q, curTask, tcb[curTask].priority);
+			printf("sem wait\n queue for %s",s->name);
+			printq(s->q);
 			swapTask();						// reschedule the tasks
 			return 1;
 		}
@@ -212,6 +220,8 @@ Semaphore* createSemaphore(char* name, int type, int state)
 	sem->type = type;							// 0=binary, 1=counting
 	sem->state = state;						// initial semaphore state
 	sem->taskNum = curTask;					// set parent task #
+	sem->q = (PQ*)malloc(sizeof(PQ));
+	sem->q->size = 0;
 
 	// prepend to semaphore list
 	sem->semLink = (struct semaphore*)semaphoreList;
@@ -249,6 +259,7 @@ bool deleteSemaphore(Semaphore** semaphore)
 			//    semaphores blocked queue????
 			free(sem->name);
 			free(sem);
+			free(sem->q);
 
 			return TRUE;
 		}
