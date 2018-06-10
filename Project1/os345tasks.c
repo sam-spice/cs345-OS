@@ -146,6 +146,10 @@ static void exitTask(int taskId)
 	// 3. set state to exit
 
 	// ?? add code here
+	deQ(rq, taskId);
+	if (tcb[taskId].state == S_BLOCKED) {
+		deQ(tcb[taskId].event->q, taskId);
+	}
 
 	tcb[taskId].state = S_EXIT;			// EXIT task state
 	return;
@@ -168,6 +172,10 @@ int sysKillTask(int taskId)
 	// signal task terminated
 	semSignal(taskSems[taskId]);
 
+	deQ(rq, taskId);
+	if (tcb[taskId].state == S_BLOCKED) {
+		deQ(tcb[taskId].event->q, taskId);
+	}
 	// look for any semaphores created by this task
 	while(sem = *semLink)
 	{

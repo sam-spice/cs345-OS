@@ -46,6 +46,8 @@ extern Semaphore* inBufferReady;			// input buffer ready semaphore
 
 extern Semaphore* tics1sec;				// 1 second semaphore
 extern Semaphore* tics10thsec;				// 1/10 second semaphore
+extern Semaphore* tic_10_sec;
+
 
 extern char inChar;				// last entered character
 extern int charFlag;				// 0 => buffered input
@@ -57,6 +59,8 @@ extern char lastBuffer[INBUF_SIZE + 1];
 extern time_t oldTime1;					// old 1sec time
 extern clock_t myClkTime;
 extern clock_t myOldClkTime;
+extern time_t oldTime_10;
+
 
 extern int pollClock;				// current clock()
 extern int lastPollClock;			// last pollClock
@@ -194,7 +198,15 @@ static void timer_isr()
 		// signal 1 second
   	   semSignal(tics1sec);
 		oldTime1 += 1;
+		oldTime_10++;
   	}
+	
+	if (oldTime_10 >= 10)
+	{
+		// signal 1 second
+		semSignal(tic_10_sec);
+		oldTime_10 = 0;
+	}
 
 	// sample fine clock
 	myClkTime = clock();

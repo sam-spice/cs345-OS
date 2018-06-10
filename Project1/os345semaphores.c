@@ -67,8 +67,8 @@ temp:	// ?? temporary label
 
 				// ?? move task from blocked to ready queue
 				enQ(rq, inQueue, tcb[inQueue].priority);
-				printf("sem sig\n queue for %s", s->name);
-				printq(s->q);
+				//printf("sem sig\n queue for %s", s->name);
+				//printq(s->q);
 				if (!superMode) swapTask();
 				return;
 		}
@@ -79,10 +79,23 @@ temp:	// ?? temporary label
 	}
 	else
 	{
-		// counting semaphore
-		// ?? implement counting semaphore
+		if ((inQueue = deQ(s->q, -1)) >= 0) // look for suspended task
+		{
 
-		goto temp;
+			//s->state--;				// decrement semaphore counter
+			tcb[inQueue].event = 0;			// clear event pointer
+			tcb[inQueue].state = S_READY;	// unblock task
+
+											// ?? move task from blocked to ready queue
+			enQ(rq, inQueue, tcb[inQueue].priority);
+			//printf("sem sig\n queue for %s", s->name);
+			//printq(s->q);
+			if (!superMode) swapTask();
+			return;
+		}
+		else {
+			s->state++;
+		}
 	}
 } // end semSignal
 
@@ -117,7 +130,7 @@ temp:	// ?? temporary label
 			// ?? move task from ready queue to blocked queue
 			deQ(rq, curTask);
 			enQ(s->q, curTask, tcb[curTask].priority);
-			printf("sem wait\n queue for %s",s->name);
+			printf("\nsem wait\n\tqueue for %s",s->name);
 			printq(s->q);
 			swapTask();						// reschedule the tasks
 			return 1;
@@ -128,10 +141,27 @@ temp:	// ?? temporary label
 	}
 	else
 	{
-		// counting semaphore
-		// ?? implement counting semaphore
+		if (s->state == 0)
+		{
+			tcb[curTask].event = s;		// block task
+			tcb[curTask].state = S_BLOCKED;
 
-		goto temp;
+
+			// ?? move task from ready queue to blocked queue
+			deQ(rq, curTask);
+			enQ(s->q, curTask, tcb[curTask].priority);
+			//printf("sem wait\n queue for %s", s->name);
+			//printq(s->q);
+			swapTask();						// reschedule the tasks
+			return 0;
+		}
+		else {
+			s->state--;
+			deQ(rq, curTask);
+			enQ(rq, curTask, tcb[curTask].priority);
+			swapTask();
+			return s->state;
+		}
 	}
 } // end semWait
 
@@ -169,8 +199,13 @@ temp:	// ?? temporary label
 	{
 		// counting semaphore
 		// ?? implement counting semaphore
-
-		goto temp;
+		if (s->state == 0)
+		{
+			return 0;
+		}
+		// state is non-zero (semaphore already signaled)
+		s->state--;						// reset state, and don't block
+		return s->state;
 	}
 } // end semTryLock
 
@@ -257,9 +292,10 @@ bool deleteSemaphore(Semaphore** semaphore)
 			// ?? free all semaphore memory
 			// ?? What should you do if there are tasks in this
 			//    semaphores blocked queue????
+			free(sem->q);
 			free(sem->name);
 			free(sem);
-			free(sem->q);
+			
 
 			return TRUE;
 		}
