@@ -38,7 +38,7 @@ typedef struct
 	struct
 	{
 		Semaphore* sem;
-		unsigned short delta;
+		int delta;
 	} times[MAX_TASKS];
 } DC;
 // project 3 variables
@@ -134,8 +134,6 @@ int P3_project3(int argc, char* argv[])
 	// wait for park to get initialized...
 	while (!parkMutex) SWAP;
 	printf("\nStart Jurassic Park...");
-	myPark.numInCarLine = myPark.numInPark = 4;
-
 	
 	semWait(parkMutex);
 	for (int i = 0; i < 4; i++) {
@@ -148,6 +146,7 @@ int P3_project3(int argc, char* argv[])
 	semSignal(parkMutex);
 
 	//create visitors
+	semWait(parkMutex);
 	for (int i = 0; i < 45; i++) {
 		char* visArgv[2];
 		sprintf(buf, "Vis ID: %d", i);
@@ -155,6 +154,7 @@ int P3_project3(int argc, char* argv[])
 		createTask("Visitor", VisitorTask, MED_PRIORITY, 1, visArgv);
 		SWAP;
 	}
+	semSignal(parkMutex);
 	//?? create car, driver, and visitor tasks here
 
 	return 0;
@@ -176,16 +176,14 @@ int P3_Clock(int argc, char* argv[]) {
 	while (1) {
 		semWait(tics10thsec); SWAP;
 		//printf("HERE! Behold!\n");
-		if (decDC(parkClock)) {
-			printDC(parkClock); SWAP;
-		}
+		decDC(parkClock); SWAP;
 	}
 }
 
 int Car_Task(int argc, char* argv[]) {
 	//myPark.numInCarLine = myPark.numInPark = 4;
 	int car_id = atoi(argv[0]); SWAP;
-	Semaphore* my_sem = tcb[curTask].event;
+	Semaphore* my_sem = taskSems[curTask]; SWAP;
 	printf("\nI am car: %d", car_id); SWAP;
 	while (1) {
 		for (int i = 0; i < 3; i++) {
@@ -242,17 +240,18 @@ int Car_Task(int argc, char* argv[]) {
 }
 
 int VisitorTask(int argc, char* argv[]) {
-	Semaphore * mySem = tcb[curTask].event; SWAP;
+	Semaphore * mySem = taskSems[curTask]; SWAP;
 	//wait to show up
 	int wait_time = (rand() % 100); SWAP;
 	addDC(parkClock, wait_time, mySem); SWAP;
 	
-	printf("Here id: %d", curTask);
-
 	semWait(mySem); SWAP;
-	printf("Here id: %d", curTask);
 
+	semWait(parkMutex); SWAP;
+	myPark.numOutsidePark++; SWAP;
+	semSignal(parkMutex); SWAP;
 
+	while (1) SWAP;
 
 }
 
@@ -395,6 +394,9 @@ int addDC(DC* dc, int time, Semaphore * sem) {
 			
 			// adjust next time appropriately
 			dc->times[i + 1].delta -= time;
+			if (dc->times[i + 1].delta < 0) {
+				dc->times[i + 1].delta = 0; SWAP;
+			}
 			
 			// get val to return and unblock
 			to_return = ++dc->size; SWAP;
@@ -403,6 +405,9 @@ int addDC(DC* dc, int time, Semaphore * sem) {
 		}
 		else {
 			time -= dc->times[i].delta; SWAP;
+			if (time < 0) {
+				time = 0; SWAP;
+			}
 		}
 	}
 	// largest time in list, place at end of list and adjust accordingly
@@ -420,7 +425,7 @@ int decDC(DC* dc) {
 	while (dc->times[0].delta == 0 && dc->size > 0) {
 		to_return++;  SWAP;
 		semSignal(dc->times[0].sem); SWAP;
-		printf("\nsem triggered: %s", dc->times[0].sem->name); SWAP;
+		//printf("\nsem triggered: %s", dc->times[0].sem->name); SWAP;
 		for (int i = 0; i < dc->size; i++) {
 			dc->times[i] = dc->times[i + 1]; SWAP;
 		}
