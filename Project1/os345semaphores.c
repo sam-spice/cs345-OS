@@ -130,8 +130,8 @@ temp:	// ?? temporary label
 			// ?? move task from ready queue to blocked queue
 			deQ(rq, curTask);
 			enQ(s->q, curTask, tcb[curTask].priority);
-			printf("\nsem wait\n\tqueue for %s",s->name);
-			printq(s->q);
+			//printf("\nsem wait\n\tqueue for %s",s->name);
+			//printq(s->q);
 			swapTask();						// reschedule the tasks
 			return 1;
 		}
