@@ -213,7 +213,7 @@ static void timer_isr()
 	if ((myClkTime - myOldClkTime) >= ONE_TENTH_SEC)
 	{
 		myOldClkTime = myOldClkTime + ONE_TENTH_SEC;   // update old
-		semSignal(tics10thsec);
+		if(tics10thsec) semSignal(tics10thsec);
 	}
 
 	// ?? add other timer sampling/signaling code here for project 2

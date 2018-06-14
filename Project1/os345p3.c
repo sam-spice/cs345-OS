@@ -43,6 +43,8 @@ typedef struct
 } DC;
 // project 3 variables
 Semaphore* DCMutex;
+
+// car related semaphore
 Semaphore* getPassenger;
 Semaphore* seatTaken;
 Semaphore* passengerSeated;
@@ -56,7 +58,27 @@ Semaphore* releaseDriver;
 Semaphore* waitMalbox;
 Semaphore* mailBoxAcquired;
 Semaphore* mailbox;
+Semaphore* driverWaitMail;
+Semaphore* DriverMailAcquired;
+Semaphore* driverMailbox;
 
+Semaphore* driverMailMutex; 
+Semaphore* MailMut;
+
+// park entrance_mutex 
+Semaphore* num_in_park;
+
+//visitor ticket and car semaphores
+Semaphore* tickets;
+Semaphore* requestTicketMutex;
+Semaphore* needTicket;
+Semaphore* takeTicket;
+Semaphore* giftShop;
+
+//museum semaphore
+Semaphore* museumEntrance;
+
+// delta clock
 DC * parkClock;
 
 
@@ -85,6 +107,9 @@ int Car_Task(int, char**);
 //visitor
 int VisitorTask(int, char**);
 
+//driver
+int DriverTask(int, char**);
+
 // ***********************************************************************
 // ***********************************************************************
 // project3 command
@@ -104,24 +129,48 @@ int P3_project3(int argc, char* argv[])
 	seatTaken = createSemaphore("Seat Taken", 0, 0);
 	passengerSeated = createSemaphore("Passenger Seated", 0, 0);
 	needDriverMutex = createSemaphore("NeedDriver", 0, 1);
-	wakeupDriver = createSemaphore("Wakeup Driver", 0, 0);
+	wakeupDriver = createSemaphore("Wakeup Driver", 1, 0);
 	haveDriver = createSemaphore("Have Driver", 0, 0);
 	outPassenger = createSemaphore("Out Passenger", 0, 0);
 	outSeat = createSemaphore("Out of Seat", 0, 0);
 	passengerOut = createSemaphore("Passenger out", 0, 0);
 	releaseDriver = createSemaphore("Driver out", 0, 0);
-	waitMalbox = createSemaphore("Driver Mail", 0, 1);
+	
+	//mailboxes
+	waitMalbox = createSemaphore("Driver Mail", 0, 0);
 	mailBoxAcquired = createSemaphore("Mail Delivered", 0, 0);
+	
+	driverWaitMail = createSemaphore("wait rider Mail", 0, 0);
+	DriverMailAcquired = createSemaphore("rider Mail Delivered", 0, 0);
+
+	MailMut = createSemaphore("Driver Mail mutex", 0, 1);
+	driverMailMutex = createSemaphore("Rider Mail mutex", 0, 1);
+
+
+	tics10thsec = createSemaphore("tics10thsec", COUNTING, 0);
+	
+	//visitor semaphores
+	num_in_park = createSemaphore("num in park", COUNTING, MAX_IN_PARK);
+	tickets = createSemaphore("Ticket Line", COUNTING, MAX_TICKETS);
+	requestTicketMutex = createSemaphore("ticket request", BINARY, 1);
+	needTicket = createSemaphore("need ticket", COUNTING, 0);
+	takeTicket = createSemaphore("take ticket", BINARY, 0);
+	
+	//museum semaphore
+	museumEntrance = createSemaphore("museum line", COUNTING, MAX_IN_MUSEUM);
+
+	//gift shop
+	giftShop = createSemaphore("gift shop", COUNTING, MAX_IN_GIFTSHOP);
 
 	char* clock_argv[2];
-	
+
 	clock_argv[0] = "temp";
 	createTask("DC Task",				// task name
 		P3_Clock,				// task
 		HIGH_PRIORITY,				// task priority
 		1,								// task count
 		clock_argv);
-
+	
 	// start park
 	sprintf(buf, "jurassicPark");
 	newArgv[0] = buf;
@@ -145,9 +194,21 @@ int P3_project3(int argc, char* argv[])
 	}
 	semSignal(parkMutex);
 
+	
+	semWait(parkMutex);
+	for (int i = 0; i < 4; i++) {
+		char* carArgv[2];
+		sprintf(buf, "%d", i);
+		carArgv[0] = buf;
+		createTask(buf, DriverTask, MED_PRIORITY, 1, carArgv);
+		SWAP;
+	}
+	semSignal(parkMutex);
+	
+
 	//create visitors
 	semWait(parkMutex);
-	for (int i = 0; i < 45; i++) {
+	for (int i = 0; i < NUM_VISITORS; i++) {
 		char* visArgv[2];
 		sprintf(buf, "Vis ID: %d", i);
 		visArgv[0] = buf;
@@ -156,6 +217,20 @@ int P3_project3(int argc, char* argv[])
 	}
 	semSignal(parkMutex);
 	//?? create car, driver, and visitor tasks here
+	
+	//create drivers
+	/*semWait(parkMutex);
+	for (int i = 0; i < 4; i++) {
+		char* carArgv[2];
+		sprintf(buf, "%d", i);
+		carArgv[0] = buf;
+		createTask("Car", DriverTask, MED_PRIORITY, 1, carArgv);
+		SWAP;
+	}
+	semSignal(parkMutex);
+	*/
+
+	
 
 	return 0;
 } // end project3
@@ -184,9 +259,12 @@ int Car_Task(int argc, char* argv[]) {
 	//myPark.numInCarLine = myPark.numInPark = 4;
 	int car_id = atoi(argv[0]); SWAP;
 	Semaphore* my_sem = taskSems[curTask]; SWAP;
+	Semaphore* driver_sem = NULL; SWAP;
+	my_sem->name = argv[0];
 	printf("\nI am car: %d", car_id); SWAP;
 	while (1) {
 		for (int i = 0; i < 3; i++) {
+			void* temp = &myPark;
 			semWait(fillSeat[car_id]); SWAP;
 			
 			// signal ready for passenger
@@ -198,7 +276,16 @@ int Car_Task(int argc, char* argv[]) {
 			semWait(seatTaken); SWAP;
 
 			//remove passenger from line
+			semWait(MailMut); SWAP;
+			mailbox = my_sem; 
+			semSignal(waitMalbox); SWAP;
+			semWait(mailBoxAcquired);
+			semSignal(MailMut); SWAP;
+			
 			semSignal(passengerSeated); SWAP;
+			
+
+			
 			if (i == 2) {
 				//only i can get driver
 				semWait(needDriverMutex); SWAP;
@@ -210,49 +297,218 @@ int Car_Task(int argc, char* argv[]) {
 				semWait(haveDriver); SWAP;
 				
 				//pass car id to driver
-				semWait(waitMalbox); SWAP;
-				mailbox = my_sem;
-				semWait(mailBoxAcquired);
-				semSignal(waitMalbox);
+				semWait(driverMailMutex); SWAP;
+				driverMailbox = my_sem; SWAP;
+				semSignal(driverWaitMail); SWAP;
+				semWait(DriverMailAcquired);
+				semSignal(driverMailMutex); SWAP;
+				
+				semWait(driverWaitMail); SWAP;
+				driver_sem = driverMailbox;
+				semSignal(DriverMailAcquired); SWAP;
 
 
 				//have a driver someone else can get one
 				semSignal(needDriverMutex); SWAP;
+				
 			}
 			semSignal(seatFilled[car_id]); SWAP;
+			
 		}
 
 		semWait(rideOver[car_id]); SWAP;
 		for (int i = 0; i < 3; i++) {
 			// tell passenger they can get out
-			semSignal(outPassenger); SWAP;
-
-			// wait for passenger to get out
-			semWait(outSeat); SWAP;
-
-			//passenger is out
-			semSignal(passengerOut); SWAP;
+			semSignal(my_sem); SWAP;
 		}
 		// release driver to the wild;
-		semSignal(releaseDriver); SWAP;
+		semSignal(driver_sem); SWAP;
 		
 	}
+}
+
+void wait_random_time(int max_time,Semaphore*  mySem) {
+	int wait_time = (rand() % max_time); SWAP;
+	addDC(parkClock, wait_time, mySem); SWAP;
+	semWait(mySem); SWAP;
+}
+
+void show_up() {
+	semWait(parkMutex); SWAP;
+	myPark.numOutsidePark++;
+	semSignal(parkMutex); SWAP;
+}
+
+void enter_park() {
+	semWait(num_in_park); SWAP;
+	semWait(parkMutex); SWAP;
+	myPark.numInPark++; SWAP;
+	myPark.numInTicketLine++; SWAP;
+	myPark.numOutsidePark--; SWAP;
+	semSignal(parkMutex); SWAP;
+}
+
+void get_ticket() {
+	semWait(tickets); SWAP;
+	semWait(requestTicketMutex); SWAP;
+	semSignal(needTicket); SWAP;
+	semSignal(wakeupDriver); SWAP;
+	semWait(takeTicket); SWAP;
+	semSignal(requestTicketMutex); SWAP;
+}
+
+void go_to_museum_line() {
+	semWait(parkMutex); SWAP;
+	myPark.numInTicketLine--; SWAP;
+	myPark.numTicketsAvailable--; SWAP;
+	myPark.numInMuseumLine++; SWAP;
+	semSignal(parkMutex); SWAP;
+}
+
+void enter_museum() {
+	semWait(museumEntrance); SWAP;
+	semWait(parkMutex); SWAP;
+	myPark.numInMuseumLine--; SWAP;
+	myPark.numInMuseum++; SWAP;
+	semSignal(parkMutex); SWAP;
+
+}
+
+void exit_museum() {
+	semWait(parkMutex); SWAP;
+	myPark.numInMuseum--; SWAP;
+	myPark.numInCarLine++; SWAP;
+	semSignal(parkMutex); SWAP;
+
+	semSignal(museumEntrance); SWAP;
+}
+
+//ride in car and exit to gift shop
+void ride_car() {
+	semWait(getPassenger); SWAP;
+	semSignal(seatTaken); SWAP;
+	semWait(waitMalbox); SWAP;
+	Semaphore* mail = mailbox;
+	semSignal(mailBoxAcquired); SWAP;
+
+	semWait(passengerSeated); SWAP;
+	semWait(parkMutex); SWAP;
+	myPark.numInCarLine--; SWAP;
+	myPark.numInCars++; SWAP;
+	semSignal(parkMutex); SWAP;
+
+	semWait(mail); SWAP;
+	semWait(parkMutex); SWAP;
+	myPark.numInCars--; SWAP;
+	myPark.numInGiftLine++; SWAP;
+	myPark.numTicketsAvailable++; SWAP;
+	semSignal(parkMutex); SWAP;
+
+	semSignal(tickets); SWAP;
 }
 
 int VisitorTask(int argc, char* argv[]) {
 	Semaphore * mySem = taskSems[curTask]; SWAP;
 	//wait to show up
-	int wait_time = (rand() % 100); SWAP;
-	addDC(parkClock, wait_time, mySem); SWAP;
+	wait_random_time(100, mySem); SWAP;
 	
-	semWait(mySem); SWAP;
+	//arrive at park
+	show_up(); SWAP;
 
+	//enter the park
+	enter_park(); SWAP;
+
+	//wait in ticket line
+	wait_random_time(30, mySem);
+	
+	//get ticket
+	get_ticket(); SWAP;
+	
+	go_to_museum_line(); SWAP;
+
+	//wait random time in museum line
+	wait_random_time(30, mySem);
+
+	enter_museum(); SWAP;
+
+	// wait random time in museum
+	wait_random_time(40, mySem);
+
+	exit_museum(); SWAP;
+
+	//wait random time in car line
+	wait_random_time(30, mySem);
+
+	ride_car(); SWAP;
+
+	//wait random time in gift shop line
+	wait_random_time(30, mySem);
+
+	semWait(giftShop); SWAP;
 	semWait(parkMutex); SWAP;
-	myPark.numOutsidePark++; SWAP;
+	myPark.numInGiftLine--; SWAP;
+	myPark.numInGiftShop++; SWAP;
 	semSignal(parkMutex); SWAP;
 
-	while (1) SWAP;
+	wait_random_time(40, mySem);
 
+	semWait(parkMutex); SWAP;
+	myPark.numInGiftShop--; SWAP;
+	myPark.numInPark--; SWAP;
+	myPark.numExitedPark++; SWAP;
+	semSignal(parkMutex); SWAP;
+
+	semSignal(giftShop); SWAP;
+	semSignal(num_in_park); SWAP;
+
+}
+
+int DriverTask(int argc, char* argv[]) {
+	int driver_id = atoi(argv[0]); SWAP;
+	Semaphore* my_sem = taskSems[curTask]; SWAP;
+	my_sem->name = "Driver!";
+
+	while (myPark.numExitedPark < NUM_VISITORS) {
+		semWait(wakeupDriver); SWAP;
+		int try_lock = semTryLock(needTicket);
+		if (try_lock) {
+			semWait(parkMutex); SWAP;
+			myPark.drivers[driver_id] = -1; SWAP;
+			semSignal(parkMutex); SWAP;
+			semSignal(takeTicket); SWAP;
+
+			semWait(parkMutex); SWAP;
+			myPark.drivers[driver_id] = 0; SWAP;
+			semSignal(parkMutex); SWAP;
+			//printf("ticket Taken!\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+		}
+		else {
+			semSignal(haveDriver); SWAP;
+			
+			semWait(driverWaitMail); SWAP;
+			Semaphore* mail = driverMailbox;
+			int car = atoi(mail->name); SWAP;
+			semWait(parkMutex); SWAP;
+			myPark.drivers[driver_id] = car + 1; SWAP;
+			semSignal(parkMutex);
+			semSignal(DriverMailAcquired); SWAP;
+
+			semWait(driverMailMutex); SWAP;
+			driverMailbox = my_sem; SWAP;
+			semSignal(driverWaitMail); SWAP;
+			semWait(DriverMailAcquired); SWAP;
+			semSignal(driverMailMutex); SWAP;
+			
+			semWait(my_sem); SWAP;
+			
+			semWait(parkMutex); SWAP;
+			myPark.drivers[driver_id] = 0; SWAP;
+			semSignal(mailBoxAcquired); SWAP;
+			semSignal(parkMutex); SWAP;
+			
+
+		}
+	}
 }
 
 /*
@@ -421,6 +677,9 @@ int addDC(DC* dc, int time, Semaphore * sem) {
 int decDC(DC* dc) {
 	semWait(DCMutex); SWAP;
 	dc->times[0].delta--; SWAP;
+	if (dc->times[0].delta < 0) {
+		dc->times[0].delta = 0; SWAP;
+	}
 	int to_return = 0; SWAP;
 	while (dc->times[0].delta == 0 && dc->size > 0) {
 		to_return++;  SWAP;

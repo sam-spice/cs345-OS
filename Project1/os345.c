@@ -140,7 +140,6 @@ int main(int argc, char* argv[])
 	inBufferReady = createSemaphore("inBufferReady", BINARY, 0);
 	keyboard = createSemaphore("keyboard", BINARY, 1);
 	tics1sec = createSemaphore("tics1sec", BINARY, 0);
-	tics10thsec = createSemaphore("tics10thsec", BINARY, 0);
 	tic_10_sec = createSemaphore("tic_10_sec", COUNTING, 0);
 
 	//?? ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

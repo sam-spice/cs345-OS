@@ -204,8 +204,8 @@ temp:	// ?? temporary label
 			return 0;
 		}
 		// state is non-zero (semaphore already signaled)
-		s->state--;						// reset state, and don't block
-		return s->state;
+		int to_return = s->state--;						// reset state, and don't block
+		return to_return;
 	}
 } // end semTryLock
 
@@ -293,7 +293,7 @@ bool deleteSemaphore(Semaphore** semaphore)
 			// ?? What should you do if there are tasks in this
 			//    semaphores blocked queue????
 			free(sem->q);
-			free(sem->name);
+			//free(sem->name);
 			free(sem);
 			
 
