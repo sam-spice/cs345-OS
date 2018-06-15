@@ -89,6 +89,7 @@ time_t oldTime_10;
 clock_t myClkTime;
 clock_t myOldClkTime;
 PQ* rq;							// ready priority queue
+fair_scheduler* p5_scheduler;
 
 
 // **********************************************************************
@@ -207,10 +208,19 @@ static int scheduler()
 	{
 		if (++nextTask >= MAX_TASKS) nextTask = 0;
 	}*/
-	
-	if ((nextTask = deQ(rq, -1)) >= 0)
-	{
-		enQ(rq, nextTask, tcb[nextTask].priority);
+	if (scheduler_mode) {
+		
+		if ((nextTask = deQ(rq, -1)) >= 0)
+		{
+			enQ(rq, nextTask, tcb[nextTask].priority);
+		}
+		if (!(get_time_for_task(nextTask, p5_scheduler) > 0)) return -1;
+	}
+	else {
+		if ((nextTask = deQ(rq, -1)) >= 0)
+		{
+			enQ(rq, nextTask, tcb[nextTask].priority);
+		}
 	}
 	if (tcb[nextTask].signal & mySIGSTOP) return -1;
 

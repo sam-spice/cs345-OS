@@ -141,6 +141,10 @@
     <ClInclude Include="os345park.h" />
     <ClInclude Include="os345signals.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\..\Downloads\crawler.hex" />
+    <None Include="..\..\..\..\Downloads\memtest.hex" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

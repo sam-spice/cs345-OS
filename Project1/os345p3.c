@@ -242,7 +242,7 @@ int P3_project3(int argc, char* argv[])
 // delta clock command
 int P3_dc(int argc, char* argv[])
 {
-	printDC(parkClock); 
+	printDC(parkClock); SWAP;
 	return 1;
 } // end CL3_dc
 
@@ -260,11 +260,12 @@ int Car_Task(int argc, char* argv[]) {
 	int car_id = atoi(argv[0]); SWAP;
 	Semaphore* my_sem = taskSems[curTask]; SWAP;
 	Semaphore* driver_sem = NULL; SWAP;
-	my_sem->name = argv[0];
+	my_sem->name = argv[0]; SWAP;
 	printf("\nI am car: %d", car_id); SWAP;
 	while (1) {
 		for (int i = 0; i < 3; i++) {
-			void* temp = &myPark;
+
+			void* temp = &myPark; SWAP;
 			semWait(fillSeat[car_id]); SWAP;
 			
 			// signal ready for passenger
@@ -277,9 +278,9 @@ int Car_Task(int argc, char* argv[]) {
 
 			//remove passenger from line
 			semWait(MailMut); SWAP;
-			mailbox = my_sem; 
+			mailbox = my_sem; SWAP;
 			semSignal(waitMalbox); SWAP;
-			semWait(mailBoxAcquired);
+			semWait(mailBoxAcquired); SWAP;
 			semSignal(MailMut); SWAP;
 			
 			semSignal(passengerSeated); SWAP;
@@ -300,11 +301,11 @@ int Car_Task(int argc, char* argv[]) {
 				semWait(driverMailMutex); SWAP;
 				driverMailbox = my_sem; SWAP;
 				semSignal(driverWaitMail); SWAP;
-				semWait(DriverMailAcquired);
+				semWait(DriverMailAcquired); SWAP;
 				semSignal(driverMailMutex); SWAP;
 				
 				semWait(driverWaitMail); SWAP;
-				driver_sem = driverMailbox;
+				driver_sem = driverMailbox; SWAP;
 				semSignal(DriverMailAcquired); SWAP;
 
 
@@ -335,7 +336,7 @@ void wait_random_time(int max_time,Semaphore*  mySem) {
 
 void show_up() {
 	semWait(parkMutex); SWAP;
-	myPark.numOutsidePark++;
+	myPark.numOutsidePark++; SWAP;
 	semSignal(parkMutex); SWAP;
 }
 
@@ -388,7 +389,7 @@ void ride_car() {
 	semWait(getPassenger); SWAP;
 	semSignal(seatTaken); SWAP;
 	semWait(waitMalbox); SWAP;
-	Semaphore* mail = mailbox;
+	Semaphore* mail = mailbox; SWAP;
 	semSignal(mailBoxAcquired); SWAP;
 
 	semWait(passengerSeated); SWAP;
@@ -419,7 +420,7 @@ int VisitorTask(int argc, char* argv[]) {
 	enter_park(); SWAP;
 
 	//wait in ticket line
-	wait_random_time(30, mySem);
+	wait_random_time(30, mySem); SWAP;
 	
 	//get ticket
 	get_ticket(); SWAP;
@@ -427,22 +428,22 @@ int VisitorTask(int argc, char* argv[]) {
 	go_to_museum_line(); SWAP;
 
 	//wait random time in museum line
-	wait_random_time(30, mySem);
+	wait_random_time(30, mySem); SWAP;
 
 	enter_museum(); SWAP;
 
 	// wait random time in museum
-	wait_random_time(40, mySem);
+	wait_random_time(40, mySem); SWAP;
 
 	exit_museum(); SWAP;
 
 	//wait random time in car line
-	wait_random_time(30, mySem);
+	wait_random_time(30, mySem); SWAP;
 
 	ride_car(); SWAP;
 
 	//wait random time in gift shop line
-	wait_random_time(30, mySem);
+	wait_random_time(30, mySem); SWAP;
 
 	semWait(giftShop); SWAP;
 	semWait(parkMutex); SWAP;
@@ -450,7 +451,7 @@ int VisitorTask(int argc, char* argv[]) {
 	myPark.numInGiftShop++; SWAP;
 	semSignal(parkMutex); SWAP;
 
-	wait_random_time(40, mySem);
+	wait_random_time(40, mySem); SWAP;
 
 	semWait(parkMutex); SWAP;
 	myPark.numInGiftShop--; SWAP;
@@ -466,11 +467,11 @@ int VisitorTask(int argc, char* argv[]) {
 int DriverTask(int argc, char* argv[]) {
 	int driver_id = atoi(argv[0]); SWAP;
 	Semaphore* my_sem = taskSems[curTask]; SWAP;
-	my_sem->name = "Driver!";
+	my_sem->name = "Driver!"; SWAP;
 
 	while (myPark.numExitedPark < NUM_VISITORS) {
 		semWait(wakeupDriver); SWAP;
-		int try_lock = semTryLock(needTicket);
+		int try_lock = semTryLock(needTicket); SWAP;
 		if (try_lock) {
 			semWait(parkMutex); SWAP;
 			myPark.drivers[driver_id] = -1; SWAP;
@@ -486,11 +487,11 @@ int DriverTask(int argc, char* argv[]) {
 			semSignal(haveDriver); SWAP;
 			
 			semWait(driverWaitMail); SWAP;
-			Semaphore* mail = driverMailbox;
+			Semaphore* mail = driverMailbox; SWAP;
 			int car = atoi(mail->name); SWAP;
 			semWait(parkMutex); SWAP;
 			myPark.drivers[driver_id] = car + 1; SWAP;
-			semSignal(parkMutex);
+			semSignal(parkMutex); SWAP;
 			semSignal(DriverMailAcquired); SWAP;
 
 			semWait(driverMailMutex); SWAP;
@@ -649,7 +650,7 @@ int addDC(DC* dc, int time, Semaphore * sem) {
 			dc->times[i].sem = sem; SWAP;
 			
 			// adjust next time appropriately
-			dc->times[i + 1].delta -= time;
+			dc->times[i + 1].delta -= time;  SWAP;
 			if (dc->times[i + 1].delta < 0) {
 				dc->times[i + 1].delta = 0; SWAP;
 			}

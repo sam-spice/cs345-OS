@@ -66,7 +66,21 @@ enum {PAGE_INIT, PAGE_READ, PAGE_OLD_WRITE, PAGE_NEW_WRITE,
 // ***********************************************************************
 // system structs
 typedef int bool;						// boolean value
-typedef int TID;						// task id
+typedef int TID;
+// task id
+typedef struct
+{
+	int total_tasks; 
+	int max_total;
+	int parent_ids[5];
+	int group_size[5];
+	struct
+	{
+		int group;
+		int max_time;
+		int cur_time;
+	} times[MAX_TASKS];
+} fair_scheduler;
 
 typedef struct
 {
