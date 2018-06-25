@@ -41,7 +41,10 @@ extern int pageReads;
 extern int pageWrites;
 extern int clockRPT;					// RPT clock
 extern int clockUPT;					// UPT clock
-
+extern int clockOuter;
+extern int clockInner;
+extern int clockOuter;
+extern int clockInner;
 extern unsigned short int memory[];
 extern int getMemoryData(int);
 
@@ -65,7 +68,8 @@ int P4_project4(int argc, char* argv[])					// project 5
 {
 	// initialize lc3 memory
 	P4_initMemory(argc, argv);
-
+	clockOuter = LC3_RPT;
+	clockInner = 0;
 	// start lc3 tasks
 	loadLC3File("memtest.hex");
 	loadLC3File("crawler.hex");

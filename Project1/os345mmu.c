@@ -40,6 +40,11 @@ int memHits;						// memory hits
 int memPageFaults;					// memory faults
 int clockRPT;						// RPT clock
 int clockUPT;						// UPT clock
+//int clockOuter;
+//int clockInner; 
+int nextPage;
+int clockOuter;
+int clockInner;
 
 int getFrame(int);
 int getAvailableFrame(void);
@@ -53,9 +58,106 @@ int getFrame(int notme)
 	if (frame >=0) return frame;
 
 	// run clock
-	printf("\nWe're toast!!!!!!!!!!!!");
+	frame = Clock(notme);
+	if (frame == -1) printf("\nWe're toast!!!!!!!!!!!!");
 
 	return frame;
+}
+
+void swapFrameToSwap(int swap_idx)
+{
+	
+	int pte1;
+	int pte2;
+
+	// entry to swap, and entry to swap into its positin
+	pte1 = memory[swap_idx];
+	pte2 = memory[swap_idx + 1];
+
+	// do the swap
+	if (DIRTY(pte1) && PAGED(pte2)) accessPage(SWAPPAGE(pte2), FRAME(pte1), PAGE_OLD_WRITE);
+	else if (!PAGED(pte2)) {
+		memory[swap_idx + 1] = SET_PAGED(nextPage);
+		accessPage(NULL, FRAME(pte1), PAGE_NEW_WRITE);
+	}
+	// clear the memory if I don't do this i get weird trap errors
+	memory[swap_idx] = 0;
+	return;
+}
+
+int Clock(int curr_frame) {
+	int frame_to_return;
+
+	int loop_delimiter = 50;
+	while(loop_delimiter){
+		// variables copied from the getmemaddr func
+		int rpta, rpte1, rpte2;
+		int upta, upte1, upte2;
+		int rptFrame, uptFrame;
+
+		
+		// loop back around if you reach the end
+		if ((clockOuter += 2) >= LC3_RPT_END) {
+			clockOuter = LC3_RPT;
+			loop_delimiter--;
+		}
+
+		// grab the root page table 
+		rpte1 = memory[clockOuter];
+
+		if (DEFINED(rpte1) && REFERENCED(rpte1)) {
+			
+			memory[clockOuter] = rpte1 = CLEAR_REF(rpte1);
+		}
+		else if (DEFINED(rpte1)) {
+			// get the user page table addres
+			upta = (FRAME(rpte1) << 6);
+
+			// loop over the inner portion
+			for (int i = 0; i < 64; i += 2) { 
+				upte1 = memory[upta + i];
+				if (PINNED(upte1) || FRAME(upte1) == curr_frame)continue;
+
+				else if (DEFINED(upte1) && REFERENCED(upte1)) { 
+					// pin the root page table entry, without this I fail memtest
+					// also need to keep it pinned here without pinning it not just in memory array
+					rpte1 = SET_PINNED(rpte1);
+					memory[clockOuter] = rpte1;
+
+					//clear the reference to the upt entry
+					upte1 = CLEAR_REF(upte1);
+					memory[upta + i] = upte1;
+				}
+				//found and not referenced
+				else if (DEFINED(upte1) && !REFERENCED(upte1)) { 
+					// similar to previous block of code
+					rpte1 = SET_DIRTY(rpte1);
+					memory[clockOuter] = rpte1;
+
+					frame_to_return = FRAME(upte1);
+					swapFrameToSwap(upta + i);
+					// found the guy to get rid of so return it
+					return frame_to_return;
+				}
+				else continue;
+			}
+			// if I got here there was no frame to remove in the current upt so see if I can remove the upt
+			if (!REFERENCED(rpte1) && !PINNED(rpte1) && DEFINED(rpte1) &&FRAME(rpte1) != curr_frame) { 
+				frame_to_return = FRAME(rpte1);
+
+				swapFrameToSwap(clockOuter);
+
+				return frame_to_return;
+			}
+			// nothing could be returns so take another spin
+			else { 
+				rpte1 = CLEAR_PINNED(rpte1);
+				memory[clockOuter] = rpte1;
+			}
+
+		}
+	} 
+	return -1;
 }
 // **************************************************************************
 // **************************************************************************
@@ -74,10 +176,11 @@ int getFrame(int notme)
 //  / / / /     / 	             / /       /
 // F D R P - - f f|f f f f f f f f|S - - - p p p p|p p p p p p p p
 
-#define MMU_ENABLE	0
+#define MMU_ENABLE	1
 
 unsigned short int *getMemAdr(int va, int rwFlg)
 {
+	memAccess += 2;
 	unsigned short int pa;
 	int rpta, rpte1, rpte2;
 	int upta, upte1, upte2;
@@ -89,16 +192,43 @@ unsigned short int *getMemAdr(int va, int rwFlg)
 	rpta = tcb[curTask].RPT + RPTI(va);		// root page table address
 	rpte1 = memory[rpta];					// FDRP__ffffffffff
 	rpte2 = memory[rpta+1];					// S___pppppppppppp
-	if (DEFINED(rpte1))	{ }					// rpte defined
-		else			{ }					// rpte undefined
+	if (DEFINED(rpte1))	memHits++;					// rpte defined
+	else{									// rpte undefined
+		memPageFaults++;
+			rptFrame = getFrame(-1);
+			rpte1 = SET_DEFINED(rptFrame);
+			
+			//swap in the memory we are looking for
+			if (PAGED(rpte2)) accessPage(SWAPPAGE(rpte2), rptFrame, PAGE_READ);
+			// initialize upt memory
+			else memset(&memory[(rptFrame << 6)], 0, 128);
+	}					
+
 	memory[rpta] = SET_REF(rpte1);			// set rpt frame access bit
+	memory[rpta + 1] = rpte2;
+
 
 	upta = (FRAME(rpte1)<<6) + UPTI(va);	// user page table address
 	upte1 = memory[upta]; 					// FDRP__ffffffffff
 	upte2 = memory[upta+1]; 				// S___pppppppppppp
-	if (DEFINED(upte1))	{ }					// upte defined
-		else			{ }					// upte undefined
+	if (DEFINED(upte1))	memHits++;			// upte defined
+	// upte undefined
+	else{
+		memPageFaults++;
+		uptFrame = getFrame(FRAME(memory[rpta]));
+		memory[rpta] = SET_REF(SET_DIRTY(rpte1));
+		upte1 = SET_DEFINED(uptFrame);
+		if (PAGED(upte2)) accessPage(SWAPPAGE(upte2), uptFrame, PAGE_READ);
+		// initialize upt memory
+		// turns out there is nothing to initilialize but hey
+
+	}
+	if (rwFlg) upte1 = SET_DIRTY(upte1);
+	
+	// save upte1 
 	memory[upta] = SET_REF(upte1); 			// set upt frame access bit
+	// save changes made to upte2
+	memory[upta + 1] = upte2;
 	return &memory[(FRAME(upte1)<<6) + FRAMEOFFSET(va)];
 #else
 	return &memory[va];
@@ -163,7 +293,7 @@ int getAvailableFrame()
 // read/write to swap space
 int accessPage(int pnum, int frame, int rwnFlg)
 {
-	static int nextPage;						// swap page size
+							// swap page size
 	static int pageReads;						// page reads
 	static int pageWrites;						// page writes
 	static unsigned short int swapMemory[LC3_MAX_SWAP_MEMORY];
