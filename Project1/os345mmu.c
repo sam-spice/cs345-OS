@@ -94,17 +94,13 @@ int Clock(int curr_frame) {
 		int rpta, rpte1, rpte2;
 		int upta, upte1, upte2;
 		int rptFrame, uptFrame;
-
-		
 		// loop back around if you reach the end
 		if ((clockOuter += 2) >= LC3_RPT_END) {
 			clockOuter = LC3_RPT;
 			loop_delimiter--;
 		}
-
 		// grab the root page table 
 		rpte1 = memory[clockOuter];
-
 		if (DEFINED(rpte1) && REFERENCED(rpte1)) {
 			
 			memory[clockOuter] = rpte1 = CLEAR_REF(rpte1);
