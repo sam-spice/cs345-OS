@@ -88,10 +88,18 @@ extern int curTask;							// current task #
 //
 int fmsCloseFile(int fileDescriptor)
 {
-	// ?? add code here
-	printf("\nfmsCloseFile Not Implemented");
-
-	return ERR63;
+	int error;
+	FCB* fcb = &OFTable[fileDescriptor];
+	if (fcb->name[0] == 0) return ERR63; 
+	if (fcb->mode != OPEN_READ) { 
+		if (fcb->flags & BUFFER_ALTERED) {
+			if ((error = fmsWriteSector(fcb->buffer, C_2_S(fcb->currentCluster)))) return error;
+			fcb->flags &= ~BUFFER_ALTERED;
+		}
+		//if ((error = fmsUpdateDirEntry(fcb)))return error;
+	}
+	fcb->name[0] = 0;
+	return 0;
 } // end fmsCloseFile
 
 
@@ -138,7 +146,18 @@ int fmsDeleteFile(char* fileName)
 } // end fmsDeleteFile
 
 
+int get_free_FCB(DirEntry* to_search) {
+	FCB fcb;
+	int free_spot = -1;
+	for (int i = 0; i < NFILES; i++) {
+		fcb = OFTable[i];
+		if (!strcmp(to_search->name, fcb.name) && !strcmp(to_search->extension, fcb.extension)) return ERR62;
 
+		if (free_spot == -1 && fcb.name[0] == 0) free_spot = i;
+	}
+	if (free_spot >= 0) return free_spot;
+	else return ERR70;
+}
 // ***********************************************************************
 // ***********************************************************************
 // This function opens the file fileName for access as specified by rwMode.
@@ -163,9 +182,53 @@ int fmsDeleteFile(char* fileName)
 int fmsOpenFile(char* fileName, int rwMode)
 {
 	// ?? add code here
-	printf("\nfmsOpenFile Not Implemented");
+	DirEntry cur_file_entry;
+	int error_code = fmsGetDirEntry(fileName, &cur_file_entry);
+	if (error_code) return error_code;
 
-	return ERR61;
+	// if it is not a file but a directory cannot be open
+	if (cur_file_entry.attributes & DIRECTORY) return ERR50;
+
+	// check file access mode
+	if (rwMode == OPEN_APPEND || rwMode == OPEN_WRITE || rwMode == OPEN_RDWR) {
+		if (cur_file_entry.attributes & READ_ONLY) return ERR85;
+	}
+	else if (rwMode != OPEN_READ) return ERR85;
+	int free_spot = get_free_FCB(&cur_file_entry);
+	if (free_spot < 0) return free_spot;
+
+	FCB * new_fcb = &OFTable[free_spot];
+
+	strncpy(new_fcb->name, cur_file_entry.name, 8);
+	strncpy(new_fcb->extension, cur_file_entry.extension, 3);
+	new_fcb->attributes = cur_file_entry.attributes;
+	new_fcb->directoryCluster = CDIR;
+	new_fcb->mode = rwMode;
+	if (rwMode == OPEN_WRITE) {
+		new_fcb->fileSize = 0;
+	}
+	else {
+		new_fcb->fileSize = cur_file_entry.fileSize;
+	}
+	if (rwMode == OPEN_APPEND) new_fcb->fileIndex = new_fcb->fileSize;
+	else new_fcb->fileIndex = 0;
+	new_fcb->startCluster = cur_file_entry.startCluster;
+	new_fcb->pid = curTask;
+	new_fcb->flags = 0;
+	memset(new_fcb->buffer, 0, BYTES_PER_SECTOR * sizeof(char));
+
+	if (rwMode == OPEN_APPEND && new_fcb->startCluster > 0) {
+		unsigned short nextCluster;
+		
+		new_fcb->currentCluster = new_fcb->startCluster;
+		while ((nextCluster = getFatEntry(new_fcb->currentCluster, FAT1)) != FAT_EOC)
+			new_fcb->currentCluster = nextCluster;
+		error_code = fmsReadSector(new_fcb->buffer, C_2_S(new_fcb->currentCluster));
+		if (error_code) return error_code;
+	}
+	else new_fcb->currentCluster = 0;
+
+	return free_spot;
 } // end fmsOpenFile
 
 
@@ -182,10 +245,53 @@ int fmsOpenFile(char* fileName, int rwMode)
 //
 int fmsReadFile(int fileDescriptor, char* buffer, int nBytes)
 {
-	// ?? add code here
-	printf("\nfmsReadFile Not Implemented");
+	FCB * fcb = &OFTable[fileDescriptor];
+	if (fcb->name[0] == 0) return ERR63;
 
-	return ERR63;
+	if (fcb->mode == OPEN_WRITE || fcb->mode == OPEN_APPEND) return ERR85;
+
+	int numBytesRead = 0;
+	unsigned int bytesLeft, bufferIndex;
+	int nextCluster, error;
+	while (nBytes > 0) {
+		if(fcb->fileIndex == fcb->fileSize) return (numBytesRead ? numBytesRead : ERR66);
+		bufferIndex = fcb->fileIndex % BYTES_PER_SECTOR;
+		if ((bufferIndex == 0) && (fcb->fileIndex || !fcb->currentCluster)) {
+			if (fcb->currentCluster == 0) { 
+				if (fcb->startCluster == 0) {
+					return ERR66;
+				}
+				nextCluster = fcb->startCluster;
+				fcb->fileIndex = 0;
+			}
+			else {
+				nextCluster = getFatEntry(fcb->currentCluster, FAT1);
+				if (nextCluster == FAT_EOC) {
+					return numBytesRead;
+				}
+			}
+			if (fcb->flags & BUFFER_ALTERED) {
+				if ((error = fmsWriteSector(fcb->buffer, C_2_S(fcb->currentCluster)))) return error;
+				fcb->flags &= ~BUFFER_ALTERED;
+			}
+			if ((error = fmsReadSector(fcb->buffer, C_2_S(nextCluster)))) {
+				return error;
+			}
+			fcb->currentCluster = nextCluster;
+		}
+		bytesLeft = BYTES_PER_SECTOR - bufferIndex;
+		if (bytesLeft > nBytes) bytesLeft = nBytes;
+		if (bytesLeft > (fcb->fileSize - fcb->fileIndex)) bytesLeft = fcb->fileSize - fcb->fileIndex;
+		//memcpy(buffer, &fcb->buffer[bufferIndex], bytesLeft);
+		strncpy(buffer, &fcb->buffer[bufferIndex], bytesLeft);
+		fcb->fileIndex += bytesLeft;
+		numBytesRead += bytesLeft;
+		buffer += bytesLeft;
+		nBytes -= bytesLeft;
+	}
+
+	return numBytesRead;
+	
 } // end fmsReadFile
 
 

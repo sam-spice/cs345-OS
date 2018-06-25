@@ -143,6 +143,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Downloads\crawler.hex" />
+    <None Include="..\..\..\..\Downloads\disk1" />
+    <None Include="..\..\..\..\Downloads\disk2" />
+    <None Include="..\..\..\..\Downloads\disk3" />
+    <None Include="..\..\..\..\Downloads\disk4" />
+    <None Include="..\..\..\..\Downloads\error_disk" />
     <None Include="..\..\..\..\Downloads\memtest.hex" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

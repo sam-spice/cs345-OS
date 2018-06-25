@@ -88,5 +88,20 @@
     <None Include="..\..\..\..\Downloads\crawler.hex">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\..\Downloads\error_disk">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\..\Downloads\disk1">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\..\Downloads\disk2">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\..\Downloads\disk3">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\..\Downloads\disk4">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
