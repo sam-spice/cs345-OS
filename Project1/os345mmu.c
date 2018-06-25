@@ -140,9 +140,7 @@ int Clock(int curr_frame) {
 			// if I got here there was no frame to remove in the current upt so see if I can remove the upt
 			if (!REFERENCED(rpte1) && !PINNED(rpte1) && DEFINED(rpte1) &&FRAME(rpte1) != curr_frame) { 
 				frame_to_return = FRAME(rpte1);
-
 				swapFrameToSwap(clockOuter);
-
 				return frame_to_return;
 			}
 			// nothing could be returns so take another spin
